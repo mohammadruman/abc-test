@@ -7,6 +7,9 @@ import html
 from bs4 import BeautifulSoup
 
 
+# --------------------------- #
+# ✅ Utility for cleaning HTML
+# --------------------------- #
 def clean_html(raw_html: str) -> str:
     """Convert HTML job description to clean text."""
     if not raw_html:
@@ -17,10 +20,11 @@ def clean_html(raw_html: str) -> str:
     return " ".join(text.split())
 
 
+# --------------------------- #
+# ✅ Capgemini API Scraper (KEEPED)
+# --------------------------- #
 def crawl_capgemini_api(start_url, skills, max_jobs=10, max_pages=10):
-    """
-    Fetches jobs directly from Capgemini's internal API endpoint.
-    """
+    """Fetches jobs directly from Capgemini's internal API endpoint."""
     print("🔍 Detected Capgemini URL — using API endpoint.")
     API_URL = "https://cg-job-search-microservices.azurewebsites.net/api/job-search"
     HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; JobScraper/1.0)"}
@@ -31,11 +35,7 @@ def crawl_capgemini_api(start_url, skills, max_jobs=10, max_pages=10):
     size = 50  # jobs per page
 
     while page <= max_pages and len(all_jobs) < max_jobs:
-        params = {
-            "page": page,
-            "size": size,
-            "country_code": country_code
-        }
+        params = {"page": page, "size": size, "country_code": country_code}
 
         try:
             response = requests.get(API_URL, headers=HEADERS, params=params, timeout=15)
@@ -65,7 +65,7 @@ def crawl_capgemini_api(start_url, skills, max_jobs=10, max_pages=10):
                 "department": job.get("department"),
                 "sbu": job.get("sbu"),
                 "apply_url": job.get("apply_job_url"),
-                "description": description_text
+                "description": description_text,
             }
 
             if not skills or any(s.lower() in description_text.lower() for s in skills):
@@ -78,27 +78,111 @@ def crawl_capgemini_api(start_url, skills, max_jobs=10, max_pages=10):
     return all_jobs
 
 
+# --------------------------- #
+# ✅ Barclays Scraper (NEW)
+# --------------------------- #
+def crawl_barclays(start_url, skills, max_jobs=10, max_pages=5):
+    print("🔍 Detected Barclays URL — using static HTML scraper.")
+    HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; JobScraper/1.0)"}
+
+    all_jobs = []
+    page = 1
+
+    while page <= max_pages and len(all_jobs) < max_jobs:
+        # Barclays pagination uses CurrentPage in query string
+        if "CurrentPage=" in start_url:
+            url = re.sub(r"CurrentPage=\d+", f"CurrentPage={page}", start_url)
+        elif "?" in start_url:
+            url = f"{start_url}&CurrentPage={page}"
+        else:
+            url = f"{start_url}?CurrentPage={page}"
+
+        print(f"🌀 [Barclays] Fetching page {page} ...")
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=20)
+            if response.status_code != 200:
+                print(f"⚠️ Barclays failed on page {page}: {response.status_code}")
+                break
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            job_cards = soup.select(".list-item.list-item--card")
+
+            if not job_cards:
+                print("⚠️ No job cards found — possibly last page.")
+                break
+
+            for card in job_cards:
+                if len(all_jobs) >= max_jobs:
+                    break
+
+                # Extract title and link
+                title_tag = card.select_one(".job-title--link")
+                title = title_tag.get_text(strip=True) if title_tag else "N/A"
+                link = title_tag["href"] if title_tag and title_tag.has_attr("href") else None
+                if link and not link.startswith("http"):
+                    link = f"https://search.jobs.barclays{link}"
+
+                # Extract location
+                location_tag = card.select_one(".job-location")
+                location = location_tag.get_text(strip=True) if location_tag else "N/A"
+
+                # Extract posted date
+                date_tag = card.select_one(".job-date span")
+                date_posted = date_tag.get_text(strip=True) if date_tag else "N/A"
+
+                job = {
+                    "company": "Barclays",
+                    "title": title,
+                    "location": location,
+                    "date_posted": date_posted,
+                    "apply_url": link,
+                    "description": "",
+                }
+
+                # Filter by skill if provided
+                if not skills or any(s.lower() in title.lower() for s in skills):
+                    all_jobs.append(job)
+
+            print(f"✅ [Barclays] Page {page} done — total jobs so far: {len(all_jobs)}")
+            page += 1
+
+        except Exception as e:
+            print(f"❌ Error scraping Barclays page {page}: {e}")
+            break
+
+    print(f"🎯 Total collected: {len(all_jobs)} Barclays jobs.")
+    return all_jobs
+
+
+# --------------------------- #
+# ✅ Main Dispatcher
+# --------------------------- #
 def crawl_jobs(start_url, skills, max_jobs=10, max_pages=3):
     """
     Smart job crawler:
-    - Uses Capgemini API if URL is Capgemini
-    - Otherwise uses Playwright worker subprocess
+    - Capgemini → API-based
+    - Barclays → HTML-based
+    - Others → Playwright worker
     """
-    # ✅ Detect Capgemini and switch to API
     if "capgemini.com" in start_url:
         return crawl_capgemini_api(start_url, skills, max_jobs, max_pages)
 
-    # ✅ Otherwise, fall back to Playwright
+    elif "barclays" in start_url:
+        return crawl_barclays(start_url, skills, max_jobs, max_pages)
+
+    # ✅ Fallback for all other URLs (like Syngenta)
     args = [
         sys.executable,
         "-m",
         "job_scraper.run_playwright_worker",
-        json.dumps({
-            "url": start_url,
-            "skills": skills,
-            "max_jobs": max_jobs,
-            "max_pages": max_pages
-        }),
+        json.dumps(
+            {
+                "url": start_url,
+                "skills": skills,
+                "max_jobs": max_jobs,
+                "max_pages": max_pages,
+            }
+        ),
     ]
     out = subprocess.run(args, capture_output=True, text=True)
 
