@@ -53,6 +53,7 @@ def crawl_capgemini_api(start_url, skills, max_jobs=10, max_pages=10):
         for job in jobs:
             if len(all_jobs) >= max_jobs:
                 break
+            
             description_text = clean_html(job.get("description", ""))
             job_obj = {
                 "job_id": job.get("id"),
@@ -129,14 +130,28 @@ def crawl_barclays(start_url, skills, max_jobs=10, max_pages=5):
                 # Extract posted date
                 date_tag = card.select_one(".job-date span")
                 date_posted = date_tag.get_text(strip=True) if date_tag else "N/A"
-
+                description_text = ""
+                if link:
+                    try:
+                        job_res = requests.get(link, headers=HEADERS, timeout=15)
+                        if job_res.status_code == 200:
+                            job_soup = BeautifulSoup(job_res.text, "html.parser")
+                            # Barclays job details are inside this section
+                            desc_section = job_soup.select_one(".ats-description, .job-description, .ats-description__content")
+                        if desc_section:
+                                description_text = clean_html(desc_section.get_text())
+                        else:
+                            print(f"⚠️ Skipped job ({link}) — status {job_res.status_code}")
+                    except Exception as e:
+                        print(f"❌ Failed to fetch job description for {link}: {e}")
+                        continue
                 job = {
                     "company": "Barclays",
                     "title": title,
                     "location": location,
                     "date_posted": date_posted,
                     "apply_url": link,
-                    "description": "",
+                    "description": description_text,
                 }
 
                 # Filter by skill if provided
