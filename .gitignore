@@ -1,0 +1,85 @@
+# ===================================
+# 🐍 Python & Virtual Environment
+# ===================================
+venv/
+.env
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+*.egg
+.eggs/
+
+# ===================================
+# 🧠 IDE / Editor Files
+# ===================================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ===================================
+# 📦 Dependencies & Logs
+# ===================================
+*.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ===================================
+# 📂 Streamlit & Cache Files
+# ===================================
+.streamlit/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+
+# ===================================
+# 📁 Temporary Data / Crawled Output
+# ===================================
+crawled_output/
+data/
+output/
+tmp/
+*.tmp
+*.bak
+
+# ===================================
+# 🧰 OS Specific
+# ===================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===================================
+# 🔒 Sensitive Files
+# ===================================
+*.env
+.env.local
+*.json
+config.json
+secrets.json
+token_*.txt
+
+# ===================================
+# 🧪 Playwright Artifacts
+# ===================================
+playwright-report/
+test-results/
+.trace/
+.traces/
+*.zip
+
+# ===================================
+# 🪣 Excel / CSV Output Files
+# ===================================
+*.xlsx
+*.csv
+*.xls
+
+# ===================================
+# 🚀 Build or Dist folders
+# ===================================
+dist/
+build/
